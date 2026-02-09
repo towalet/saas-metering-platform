@@ -5,7 +5,8 @@ WORKDIR /app
 COPY pyproject.toml /app/pyproject.toml
 
 RUN pip install --no-cache-dir -U pip \
-  && pip install --no-cache-dir fastapi uvicorn[standard]
+  && pip install --no-cache-dir \
+    fastapi "uvicorn[standard]" sqlalchemy alembic "psycopg[binary]"
 
 COPY . /app
 
