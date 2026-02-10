@@ -1,0 +1,59 @@
+# SaaS Metering Platform (WIP)
+
+A production-style SaaS backend starter focused on **API key management, rate limiting, quotas, usage metering, and billing-ready reporting**.
+
+## Status (Days 1–2)
+
+### Day 1 - Containerized dev stack
+- Docker Compose stack running:
+  - FastAPI API service
+  - PostgreSQL 16
+  - Redis 7
+- Health endpoint available:
+  - `GET /health` → `{ "status": "ok" }`
+
+### Day 2 - Database + migrations
+- Added SQLAlchemy base/session structure
+- Initialized Alembic for **versioned schema migrations**
+- Created initial model(s) and generated the first migration (e.g., `users` table)
+- Applied migrations to Postgres via `alembic upgrade head`
+
+### Day 3 - Auth (signup + login with secure passwords + JWT) (In progress)
+## Goals:
+- create a user with POST /auth/signup
+
+- login with POST /auth/login -> get a JWT
+
+- call GET /auth/me with Authorization: Bearer <token>
+
+---
+
+## Tech Stack
+- **Backend:** FastAPI (Python)
+- **DB:** PostgreSQL 16
+- **Cache:** Redis 7
+- **Migrations:** SQLAlchemy + Alembic
+- **Local orchestration:** Docker Compose
+
+---
+
+## Local Development
+
+### Prerequisites
+- Docker Desktop running
+- Docker Compose available (`docker compose`)
+
+### Environment
+This project uses a root `.env` file with:
+- `APP_ENV`
+- `POSTGRES_DB`
+- `POSTGRES_HOST`
+- `POSTGRES_PASSWORD`
+- `POSTGRES_PORT`
+- `POSTGRES_USER`
+- `REDIS_HOST`
+- `REDIS_PORT`
+
+### Start the stack
+```bash
+docker compose up --build

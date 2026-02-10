@@ -6,7 +6,8 @@ COPY pyproject.toml /app/pyproject.toml
 
 RUN pip install --no-cache-dir -U pip \
   && pip install --no-cache-dir \
-    fastapi "uvicorn[standard]" sqlalchemy alembic "psycopg[binary]"
+    fastapi "uvicorn[standard]" sqlalchemy alembic "psycopg[binary]" \
+    "passlib[argon2]" "python-jose[cryptography]" "email-validator"
 
 COPY . /app
 
