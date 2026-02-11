@@ -1,6 +1,6 @@
 from typing import Literal
 
-from pydantic import BaseModel, Field, EmailStr
+from pydantic import BaseModel, ConfigDict, Field, EmailStr
 
 # Input schema for creating an org
 class OrgCreateIn(BaseModel):
@@ -8,11 +8,10 @@ class OrgCreateIn(BaseModel):
 
 # Output schema for an org
 class OrgOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     name: str
-    # of members in the org
-    class Config:
-        from_attributes = True
 
 # Input schema for adding a member to an org
 class OrgMemberAddIn(BaseModel):

@@ -1,3 +1,4 @@
+import os
 from logging.config import fileConfig
 
 from sqlalchemy import engine_from_config
@@ -14,12 +15,22 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
+# Build the database URL from environment variables so we never
+# hard-code credentials in alembic.ini.
+def _db_url() -> str:
+    user = os.getenv("POSTGRES_USER", "app")
+    pwd = os.getenv("POSTGRES_PASSWORD", "app")
+    host = os.getenv("POSTGRES_HOST", "db")
+    port = os.getenv("POSTGRES_PORT", "5432")
+    db = os.getenv("POSTGRES_DB", "appdb")
+    return f"postgresql+psycopg://{user}:{pwd}@{host}:{port}/{db}"
+
+config.set_main_option("sqlalchemy.url", _db_url())
+
 # add your model's MetaData object here
 # for 'autogenerate' support
-# from myapp import mymodel
-
 from app.db.base import Base
-from app import models  # ensures models are imported
+from app import models  # noqa: F401 – ensures models are registered
 
 target_metadata = Base.metadata
 
