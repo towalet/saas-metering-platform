@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import JWTError
 from sqlalchemy.orm import Session
 
 from app.db.deps import get_db
-from app.schemas.auth import SignupIn, LoginIn, TokenOut, UserOut
+from app.schemas.auth import SignupIn, TokenOut, UserOut
 from app.services.users import get_user_by_email, create_user
 from app.core.security import verify_password, create_access_token, decode_token
 from app.models.user import User
@@ -22,22 +22,25 @@ def signup(payload: SignupIn, db: Session = Depends(get_db)):
     if existing_user:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered")
     # If user does not exist, create a new user using the create_user function and return the created user
-    user = create_user(db, email=payload.email, password=payload.password)
+    try:
+        user = create_user(db, email=payload.email, password=payload.password)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     return user
 
 # login endpoint
 @router.post("/login", response_model=TokenOut)
-def login(payload: LoginIn, db: Session = Depends(get_db)):
-    # Retrieve the user from the database using the provided email
-    user = get_user_by_email(db, email=payload.email)
+def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    # Retrieve the user from the database using the provided email (username in OAuth2 form)
+    user = get_user_by_email(db, email=form_data.username)
     # If the user does not exist or the password is incorrect, raise an HTTPException with a 401 status code and a message indicating invalid credentials
-    if not user or not verify_password(payload.password, user.password_hash):
+    if not user or not verify_password(form_data.password, user.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
     # If the credentials are valid, create an access token using the create_access_token function and return it in a TokenOut response model
     access_token = create_access_token(subject=str(user.id))
     return TokenOut(access_token=access_token)
 
-def getCurrentUser(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> User:
+def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> User:
     try:
         # Decode the token to get the user ID
         payload = decode_token(token)
@@ -54,5 +57,8 @@ def getCurrentUser(token: str = Depends(oauth2_scheme), db: Session = Depends(ge
     return user
 
 @router.get("/me", response_model=UserOut)
-def me(current_user: User = Depends(getCurrentUser)):
+def me(current_user: User = Depends(get_current_user)):
     return current_user
+
+# Backwards-compatible alias (if any external references exist).
+getCurrentUser = get_current_user
