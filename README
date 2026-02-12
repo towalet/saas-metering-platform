@@ -10,7 +10,7 @@ A production-style SaaS backend starter focused on **API key management, rate li
   - PostgreSQL 16
   - Redis 7
 - Health endpoint available:
-  - `GET /health` → `{ "status": "ok" }`
+  - `GET /health` -> `{ "status": "ok" }`
 
 ### Day 2 - Database + migrations
 - Added SQLAlchemy base/session structure (`app/db/base.py`, `session.py`, `deps.py`)
@@ -19,31 +19,31 @@ A production-style SaaS backend starter focused on **API key management, rate li
 - Applied migrations to Postgres via `alembic upgrade head`
 
 ### Day 3 - Auth (signup, login, JWT)
-- **Signup** – `POST /auth/signup` creates a user with Argon2 password hashing
+- **Signup** - `POST /auth/signup` creates a user with Argon2 password hashing
   - Email normalization (lowercase + trim)
-  - Pydantic validation (valid email, password 10–128 chars)
+  - Pydantic validation (valid email, password 10 - 128 chars)
   - Duplicate-email rejection (400)
-- **Login** – `POST /auth/login` (OAuth2 password form) returns a signed JWT
+- **Login** - `POST /auth/login` (OAuth2 password form) returns a signed JWT
   - Configurable secret, algorithm, and expiration via env vars
   - Production-safe guard: rejects weak/default `JWT_SECRET` when `APP_ENV=production`
-- **Me** – `GET /auth/me` returns the current user from the Bearer token
+- **Me** - `GET /auth/me` returns the current user from the Bearer token
   - Token decode + user lookup; 401 on missing/invalid/expired token
-- Full test suite (`test_auth.py` – 8 tests covering happy paths & edge cases)
+- Full test suite (`test_auth.py` - 8 tests covering happy paths & edge cases)
 
 ### Day 4 - Multi-tenant organizations + RBAC
-- **Org model** – `orgs` table with id, name, created_at
-- **OrgMember model** – `org_members` join table with role (`owner` / `admin` / `member`) and unique constraint on (org_id, user_id)
+- **Org model** - `orgs` table with id, name, created_at
+- **OrgMember model** - `org_members` join table with role (`owner` / `admin` / `member`) and unique constraint on (org_id, user_id)
 - Alembic migration for `orgs` + `org_members` tables (with FK cascades)
-- **Create org** – `POST /orgs` creates an org and auto-assigns the creator as `owner`
-- **List orgs** – `GET /orgs` returns only the orgs the authenticated user belongs to (newest first)
-- **Add member** – `POST /orgs/{org_id}/members` adds (or re-roles) a user by email
+- **Create org** - `POST /orgs` creates an org and auto-assigns the creator as `owner`
+- **List orgs** - `GET /orgs` returns only the orgs the authenticated user belongs to (newest first)
+- **Add member** - `POST /orgs/{org_id}/members` adds (or re-roles) a user by email
 - **Role-based access control (RBAC):**
   - Only `owner` / `admin` can add members
   - Only `owner` can grant or revoke the `owner` role
   - Cannot demote the last owner (prevents orphaned orgs)
   - `member` role is denied from adding others (403)
 - Reusable `require_org_role()` guard in `app/core/roles.py`
-- Full test suite (`test_orgs.py` – 11 tests covering CRUD, visibility isolation, and role enforcement)
+- Full test suite (`test_orgs.py` - 11 tests covering CRUD, visibility isolation, and role enforcement)
 
 ---
 
@@ -94,7 +94,7 @@ backend/
 | POST   | `/auth/login`               | No   | Login → JWT access token             |
 | GET    | `/auth/me`                  | Yes  | Current user profile                 |
 | POST   | `/orgs`                     | Yes  | Create an organization               |
-| GET    | `/orgs`                     | Yes  | List user's organizations            |
+| GET    | `/orgs`                     | Yes  | List users organizations            |
 | POST   | `/orgs/{org_id}/members`    | Yes  | Add/update a member (owner/admin)    |
 
 ---
@@ -128,7 +128,7 @@ This project uses a root `.env` file with:
 - `POSTGRES_USER`
 - `REDIS_HOST`
 - `REDIS_PORT`
-- `JWT_SECRET` (optional in dev, **required** in production)
+- `JWT_SECRET` (must be set to a strong value in production)
 - `JWT_ALGORITHM` (default: `HS256`)
 - `JWT_EXPIRES_MINUTES` (default: `60`)
 
