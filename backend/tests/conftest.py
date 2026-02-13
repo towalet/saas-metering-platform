@@ -6,17 +6,27 @@ need Docker / Postgres.
 """
 
 import pytest
+from fastapi import Depends
 from sqlalchemy import create_engine, StaticPool
 from sqlalchemy.orm import sessionmaker
-from httpx import Client as HttpxClient
 from fastapi.testclient import TestClient
 
 from app.db.base import Base
 from app.db.deps import get_db
 from app.main import app
+from app.models.api_key import ApiKey
+from app.core.security import get_current_api_key
 
 # In-memory SQLite engine shared across a single test 
 SQLITE_URL = "sqlite://"
+
+# Test-only route to verify API key authentication 
+# This tiny endpoint exists solely so tests can verify X-API-Key auth
+# works end-to-end, without depending on /v1/events (built in Phase 6).
+
+@app.get("/test/api-key-check", tags=["test"], include_in_schema=False)
+def _test_api_key_check(api_key: ApiKey = Depends(get_current_api_key)):
+    return {"org_id": api_key.org_id, "key_id": api_key.id}
 
 
 @pytest.fixture()

@@ -2,12 +2,20 @@ import os
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
+from fastapi import Depends, HTTPException, Security, status
+from fastapi.security import APIKeyHeader
 from jose import jwt
 from passlib.context import CryptContext
+from sqlalchemy.orm import Session
+
+from app.db.deps import get_db
 
 
 # Argon2 strong password hashing scheme. passlib manages hashing/verification.
 pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
+
+# Header scheme for API key authentication -- integrates with OpenAPI docs.
+_api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 
 
 def _is_production() -> bool:
@@ -61,3 +69,42 @@ def decode_token(token: str) -> Any:
     secret = _get_jwt_secret()
     algorithm = _get_jwt_algorithm()
     return jwt.decode(token, secret, algorithms=[algorithm])
+
+# API Key authentication dependency 
+def get_current_api_key(
+    raw_key: str | None = Security(_api_key_header),
+    db: Session = Depends(get_db),
+):
+    """
+    FastAPI dependency that authenticates requests via the X-API-Key header.
+
+    Flow:
+      1. Read X-API-Key header (returns None if missing thanks to auto_error=False).
+      2. SHA-256 hash it.
+      3. Look up the hash in the api_keys table.
+      4. If not found, revoked, or expired -> 401.
+      5. Otherwise return the ApiKey row so the endpoint knows which org is calling.
+
+    Usage in an endpoint:
+        @router.get("/something")
+        def my_endpoint(api_key: ApiKey = Depends(get_current_api_key)):
+            ...
+    """
+    from app.services.api_keys import hash_key, get_key_by_hash  # avoid circular import
+
+    if not raw_key:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing X-API-Key header",
+        )
+
+    key_hash = hash_key(raw_key)
+    api_key = get_key_by_hash(db, key_hash)
+
+    if not api_key:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or revoked API key",
+        )
+
+    return api_key

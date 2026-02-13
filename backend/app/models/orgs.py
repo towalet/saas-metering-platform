@@ -11,3 +11,4 @@ class Org(Base):
     created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     members = relationship("OrgMember", back_populates="org", cascade="all, delete-orphan")
+    api_keys = relationship("ApiKey", back_populates="org", cascade="all, delete-orphan")

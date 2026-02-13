@@ -2,7 +2,7 @@
 
 A production-style SaaS backend starter focused on **API key management, rate limiting, quotas, usage metering, and billing-ready reporting**.
 
-## Status (Days 1–4)
+## Status (Days 1–5)
 
 ### Day 1 - Containerized dev stack
 - Docker Compose stack running:
@@ -45,6 +45,26 @@ A production-style SaaS backend starter focused on **API key management, rate li
 - Reusable `require_org_role()` guard in `app/core/roles.py`
 - Full test suite (`test_orgs.py` - 11 tests covering CRUD, visibility isolation, and role enforcement)
 
+### Day 5 - API Key Management + dual auth
+- **API Key model** - `api_keys` table with SHA-256 hashed key storage (plaintext is never persisted)
+  - Stripe-style prefixed keys (`smp_live_...`) for easy identification and leak scanning
+  - `key_prefix` stored for safe UI display, `key_hash` for authentication lookups
+  - Soft-delete revocation (`is_active` flag) preserves audit history
+  - Optional `expires_at` and auto-updated `last_used_at` fields
+- **Create key** - `POST /orgs/{org_id}/api-keys` generates a key and returns the plaintext **once**
+  - Only `owner` / `admin` roles can create keys (RBAC enforced)
+- **List keys** - `GET /orgs/{org_id}/api-keys` returns metadata only (prefix, status, timestamps)
+  - Neither the plaintext key nor the hash is ever returned on list
+- **Revoke key** - `DELETE /orgs/{org_id}/api-keys/{key_id}` soft-revokes (sets `is_active=False`)
+  - Revoked keys immediately stop authenticating requests
+- **X-API-Key header auth** - `get_current_api_key` FastAPI dependency for external consumer auth
+  - Hashes the incoming key, looks up the hash, checks active status and expiration
+  - Updates `last_used_at` on each successful authentication
+- **Dual authentication** - JWT for dashboard users, API keys for external API consumers
+- Alembic migration for `api_keys` table (with FK cascade to `orgs`)
+- Full test suite (`test_api_keys.py` - 18 tests covering create, list, revoke, and X-API-Key auth)
+- **37 total tests passing** across auth, orgs, and API keys
+
 ---
 
 ## Project Structure
@@ -56,10 +76,11 @@ backend/
 ├── app/
 │   ├── api/              # Route handlers
 │   │   ├── auth.py       # /auth/signup, /auth/login, /auth/me
-│   │   └── orgs.py       # /orgs CRUD + member management
+│   │   ├── orgs.py       # /orgs CRUD + member management
+│   │   └── api_keys.py   # /orgs/{id}/api-keys CRUD
 │   ├── core/
 │   │   ├── roles.py      # RBAC helper (require_org_role)
-│   │   └── security.py   # Argon2 hashing, JWT create/decode
+│   │   └── security.py   # Argon2 hashing, JWT, API key auth dependency
 │   ├── db/
 │   │   ├── base.py       # SQLAlchemy declarative base
 │   │   ├── deps.py       # FastAPI DB session dependency
@@ -67,18 +88,22 @@ backend/
 │   ├── models/
 │   │   ├── user.py       # User ORM model
 │   │   ├── orgs.py       # Org ORM model
-│   │   └── org_member.py # OrgMember ORM model
+│   │   ├── org_member.py # OrgMember ORM model
+│   │   └── api_key.py    # ApiKey ORM model (SHA-256 hashed keys)
 │   ├── schemas/
 │   │   ├── auth.py       # SignupIn, TokenOut, UserOut
-│   │   └── orgs.py       # OrgCreateIn, OrgOut, OrgMemberAddIn, OrgMemberOut
+│   │   ├── orgs.py       # OrgCreateIn, OrgOut, OrgMemberAddIn, OrgMemberOut
+│   │   └── api_keys.py   # ApiKeyCreateIn, ApiKeyCreateOut, ApiKeyOut
 │   ├── services/
 │   │   ├── users.py      # create_user, get_user_by_email
-│   │   └── orgs.py       # create_org, list_user_orgs, add_member_by_email
+│   │   ├── orgs.py       # create_org, list_user_orgs, add_member_by_email
+│   │   └── api_keys.py   # create, list, revoke, hash, lookup by hash
 │   └── main.py           # FastAPI app + router wiring
 ├── tests/
 │   ├── conftest.py       # Fixtures (in-memory SQLite, TestClient, auth helpers)
-│   ├── test_auth.py      # Auth endpoint tests
-│   └── test_orgs.py      # Org endpoint + RBAC tests
+│   ├── test_auth.py      # Auth endpoint tests (8 tests)
+│   ├── test_orgs.py      # Org endpoint + RBAC tests (11 tests)
+│   └── test_api_keys.py  # API key CRUD + X-API-Key auth tests (18 tests)
 ├── Dockerfile
 └── pyproject.toml
 ```
@@ -87,15 +112,18 @@ backend/
 
 ## API Endpoints
 
-| Method | Path                        | Auth | Description                          |
-|--------|-----------------------------|------|--------------------------------------|
-| GET    | `/health`                   | No   | Health check                         |
-| POST   | `/auth/signup`              | No   | Register a new user                  |
-| POST   | `/auth/login`               | No   | Login → JWT access token             |
-| GET    | `/auth/me`                  | Yes  | Current user profile                 |
-| POST   | `/orgs`                     | Yes  | Create an organization               |
-| GET    | `/orgs`                     | Yes  | List users organizations            |
-| POST   | `/orgs/{org_id}/members`    | Yes  | Add/update a member (owner/admin)    |
+| Method | Path                                | Auth    | Description                             |
+|--------|-------------------------------------|---------|-----------------------------------------|
+| GET    | `/health`                           | No      | Health check                            |
+| POST   | `/auth/signup`                      | No      | Register a new user                     |
+| POST   | `/auth/login`                       | No      | Login → JWT access token                |
+| GET    | `/auth/me`                          | JWT     | Current user profile                    |
+| POST   | `/orgs`                             | JWT     | Create an organization                  |
+| GET    | `/orgs`                             | JWT     | List user's organizations               |
+| POST   | `/orgs/{org_id}/members`            | JWT     | Add/update a member (owner/admin)       |
+| POST   | `/orgs/{org_id}/api-keys`           | JWT     | Generate API key (owner/admin)          |
+| GET    | `/orgs/{org_id}/api-keys`           | JWT     | List API keys (prefix only, no secrets) |
+| DELETE | `/orgs/{org_id}/api-keys/{key_id}`  | JWT     | Revoke (soft-delete) an API key         |
 
 ---
 
@@ -105,7 +133,7 @@ backend/
 - **Cache:** Redis 7
 - **ORM:** SQLAlchemy 2.0
 - **Migrations:** Alembic
-- **Auth:** Argon2 password hashing + JWT (python-jose)
+- **Auth:** Argon2 password hashing + JWT (python-jose) + SHA-256 API keys
 - **Validation:** Pydantic v2
 - **Testing:** pytest + FastAPI TestClient (in-memory SQLite)
 - **Local orchestration:** Docker Compose
