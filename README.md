@@ -2,7 +2,7 @@
 
 A production-style SaaS backend starter focused on **API key management, rate limiting, quotas, usage metering, and billing-ready reporting**.
 
-## Status (Days 1–5)
+## Status (Days 1–6)
 
 ### Day 1 - Containerized dev stack
 - Docker Compose stack running:
@@ -65,6 +65,12 @@ A production-style SaaS backend starter focused on **API key management, rate li
 - Full test suite (`test_api_keys.py` - 18 tests covering create, list, revoke, and X-API-Key auth)
 - **37 total tests passing** across auth, orgs, and API keys
 
+### Day 6 - Redis + rate limiting (fixed-window)
+- **Redis connection pool** in `backend/app/core/redis.py`: shared sync client with lazy init and configurable `REDIS_HOST` / `REDIS_PORT`, ready for rate limiting and future caching
+- **Rate limiter** in `backend/app/core/rate_limit.py`: fixed-window (per-minute default) counter using Redis `INCR` + `EXPIRE`, key format `rl:{api_key_id}:{window_start}`, returns `RateLimitResult` for headers `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`
+- **Per-org limits** stored on `Org.rate_limit_rpm` in `backend/app/models/orgs.py`
+- **Tests** added in `backend/tests/test_rate_limit.py`
+
 ---
 
 ## Project Structure
@@ -80,7 +86,9 @@ backend/
 │   │   └── api_keys.py   # /orgs/{id}/api-keys CRUD
 │   ├── core/
 │   │   ├── roles.py      # RBAC helper (require_org_role)
-│   │   └── security.py   # Argon2 hashing, JWT, API key auth dependency
+│   │   ├── security.py   # Argon2 hashing, JWT, API key auth dependency
+│   │   ├── rate_limit.py # Check and increment the rate limit counter for an API key using redis.
+│   │   └── redis.py      # Operates the redis connection pool.
 │   ├── db/
 │   │   ├── base.py       # SQLAlchemy declarative base
 │   │   ├── deps.py       # FastAPI DB session dependency
@@ -103,7 +111,8 @@ backend/
 │   ├── conftest.py       # Fixtures (in-memory SQLite, TestClient, auth helpers)
 │   ├── test_auth.py      # Auth endpoint tests (8 tests)
 │   ├── test_orgs.py      # Org endpoint + RBAC tests (11 tests)
-│   └── test_api_keys.py  # API key CRUD + X-API-Key auth tests (18 tests)
+│   ├── test_api_keys.py  # API key CRUD + X-API-Key auth tests (18 tests)
+│   └── test_rate_limit.py # Tests for the sliding-window rate limiter (6 tests)
 ├── Dockerfile
 └── pyproject.toml
 ```
