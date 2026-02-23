@@ -2,7 +2,7 @@
 
 A production-style SaaS backend starter focused on **API key management, rate limiting, quotas, usage metering, and billing-ready reporting**.
 
-## Status (Days 1–6)
+## Status (Days 1–7)
 
 ### Day 1 - Containerized dev stack
 - Docker Compose stack running:
@@ -71,6 +71,18 @@ A production-style SaaS backend starter focused on **API key management, rate li
 - **Per-org limits** stored on `Org.rate_limit_rpm` in `backend/app/models/orgs.py`
 - **Tests** added in `backend/tests/test_rate_limit.py`
 
+### Day 7 - Usage metering
+- **UsageEvent model** - `usage_events` table records every API-key-authenticated request
+  - Captures `method`, `path`, `status_code`, `response_time_ms`, `api_key_id`, `org_id`
+  - Composite index on `(org_id, created_at)` for fast time-range aggregation
+  - `api_key_id` uses `SET NULL` on delete so history survives key revocation
+- **Usage service** (`app/services/usage.py`)
+  - `record_usage()` — inserts a single event row after each request
+  - `count_usage_current_month()` — counts events for an org in the current calendar month (used by quota enforcement in Phase 4)
+- Alembic migration for `usage_events` table
+- Full test suite (`test_usage.py` — 5 tests covering record, count, and org isolation)
+- **48 total tests passing** across auth, orgs, API keys, rate limiting, and usage metering
+
 ---
 
 ## Project Structure
@@ -94,10 +106,11 @@ backend/
 │   │   ├── deps.py       # FastAPI DB session dependency
 │   │   └── session.py    # Engine & SessionLocal factory
 │   ├── models/
-│   │   ├── user.py       # User ORM model
-│   │   ├── orgs.py       # Org ORM model
-│   │   ├── org_member.py # OrgMember ORM model
-│   │   └── api_key.py    # ApiKey ORM model (SHA-256 hashed keys)
+│   │   ├── user.py        # User ORM model
+│   │   ├── orgs.py        # Org ORM model (+ rate_limit_rpm, monthly_quota)
+│   │   ├── org_member.py  # OrgMember ORM model
+│   │   ├── api_key.py     # ApiKey ORM model (SHA-256 hashed keys)
+│   │   └── usage_event.py # UsageEvent ORM model (request log)
 │   ├── schemas/
 │   │   ├── auth.py       # SignupIn, TokenOut, UserOut
 │   │   ├── orgs.py       # OrgCreateIn, OrgOut, OrgMemberAddIn, OrgMemberOut
@@ -105,14 +118,16 @@ backend/
 │   ├── services/
 │   │   ├── users.py      # create_user, get_user_by_email
 │   │   ├── orgs.py       # create_org, list_user_orgs, add_member_by_email
-│   │   └── api_keys.py   # create, list, revoke, hash, lookup by hash
+│   │   ├── api_keys.py   # create, list, revoke, hash, lookup by hash
+│   │   └── usage.py      # record_usage, count_usage_current_month
 │   └── main.py           # FastAPI app + router wiring
 ├── tests/
 │   ├── conftest.py       # Fixtures (in-memory SQLite, TestClient, auth helpers)
 │   ├── test_auth.py      # Auth endpoint tests (8 tests)
 │   ├── test_orgs.py      # Org endpoint + RBAC tests (11 tests)
 │   ├── test_api_keys.py  # API key CRUD + X-API-Key auth tests (18 tests)
-│   └── test_rate_limit.py # Tests for the sliding-window rate limiter (6 tests)
+│   ├── test_rate_limit.py # Tests for the sliding-window rate limiter (6 tests)
+│   └── test_usage.py     # Usage metering tests (5 tests)
 ├── Dockerfile
 └── pyproject.toml
 ```
