@@ -2,7 +2,7 @@
 
 A production-style SaaS backend starter focused on **API key management, rate limiting, quotas, usage metering, and billing-ready reporting**.
 
-## Status (Days 1–7)
+## Status (Days 1-8)
 
 ### Day 1 - Containerized dev stack
 - Docker Compose stack running:
@@ -81,7 +81,20 @@ A production-style SaaS backend starter focused on **API key management, rate li
   - `count_usage_current_month()` — counts events for an org in the current calendar month (used by quota enforcement in Phase 4)
 - Alembic migration for `usage_events` table
 - Full test suite (`test_usage.py` — 5 tests covering record, count, and org isolation)
-- **48 total tests passing** across auth, orgs, API keys, rate limiting, and usage metering
+
+### Day 8 - Monthly quotas
+- **Monthly quota enforcement** in `backend/app/core/quota.py`
+  - Counts this month's `usage_events` rows per org
+  - Compares usage against `Org.monthly_quota`
+  - Blocks API-key-authenticated requests when `used >= limit`
+- **Per-org quota config** via `Org.monthly_quota` (default `10000`)
+- **429 response contract** via global exception handler:
+  - `{"detail":"Monthly quota exceeded","limit":...,"used":...,"resets_at":"...Z"}`
+- **Enforced before endpoint processing** in API-key auth dependency (`get_current_api_key`)
+- **Tests** added in `backend/tests/test_quotas.py`
+  - Set quota to `3`, first 3 requests pass, 4th returns `429`
+  - Asserts exact response fields including UTC month reset timestamp
+- **49 total tests passing** across auth, orgs, API keys, rate limiting, usage metering, and quotas
 
 ---
 
@@ -100,7 +113,8 @@ backend/
 │   │   ├── roles.py      # RBAC helper (require_org_role)
 │   │   ├── security.py   # Argon2 hashing, JWT, API key auth dependency
 │   │   ├── rate_limit.py # Check and increment the rate limit counter for an API key using redis.
-│   │   └── redis.py      # Operates the redis connection pool.
+│   │   ├── redis.py      # Operates the redis connection pool.
+│   │   └── quota.py      # Quota enforcement behavior module.
 │   ├── db/
 │   │   ├── base.py       # SQLAlchemy declarative base
 │   │   ├── deps.py       # FastAPI DB session dependency
@@ -127,13 +141,17 @@ backend/
 │   ├── test_orgs.py      # Org endpoint + RBAC tests (11 tests)
 │   ├── test_api_keys.py  # API key CRUD + X-API-Key auth tests (18 tests)
 │   ├── test_rate_limit.py # Tests for the sliding-window rate limiter (6 tests)
-│   └── test_usage.py     # Usage metering tests (5 tests)
+│   ├── test_usage.py     # Usage metering tests (5 tests)
+│   └── test_quotas.py    # Sets low quota, make 3 requests (pass), 4th request returns 429 with correct body.
 ├── Dockerfile
 └── pyproject.toml
 ```
 
----
+## Recent Additions
+- `backend/app/core/quota.py` - Monthly quota dependency and reset-timestamp calculation
+- `backend/tests/test_quotas.py` - Integration test for 3-pass then 4th-request-429 quota flow
 
+---
 ## API Endpoints
 
 | Method | Path                                | Auth    | Description                             |
@@ -202,3 +220,5 @@ make up      # docker compose up --build
 make down    # docker compose down -v
 make logs    # docker compose logs -f api
 ```
+
+
