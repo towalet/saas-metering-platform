@@ -9,6 +9,7 @@ from passlib.context import CryptContext
 from sqlalchemy.orm import Session
 
 from app.db.deps import get_db
+from app.core.quota import enforce_monthly_quota
 
 
 # Argon2 strong password hashing scheme. passlib manages hashing/verification.
@@ -106,5 +107,7 @@ def get_current_api_key(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or revoked API key",
         )
-
+        
+    # Enforce the monthly quota for the org. If the quota is exceeded, raise a MonthlyQuotaExceededError.
+    enforce_monthly_quota(db, api_key.org_id)
     return api_key

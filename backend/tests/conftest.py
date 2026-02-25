@@ -6,9 +6,9 @@ need Docker / Postgres.
 """
 
 import pytest
-from fastapi import Depends
+from fastapi import Depends, Request
 from sqlalchemy import create_engine, StaticPool
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import Session, sessionmaker
 from fastapi.testclient import TestClient
 
 from app.db.base import Base
@@ -16,6 +16,7 @@ from app.db.deps import get_db
 from app.main import app
 from app.models.api_key import ApiKey
 from app.core.security import get_current_api_key
+from app.services.usage import record_usage
 
 # In-memory SQLite engine shared across a single test 
 SQLITE_URL = "sqlite://"
@@ -25,7 +26,20 @@ SQLITE_URL = "sqlite://"
 # works end-to-end, without depending on /v1/events (built in Phase 6).
 
 @app.get("/test/api-key-check", tags=["test"], include_in_schema=False)
-def _test_api_key_check(api_key: ApiKey = Depends(get_current_api_key)):
+def _test_api_key_check(
+    request: Request,
+    db: Session = Depends(get_db),
+    api_key: ApiKey = Depends(get_current_api_key),
+):
+    record_usage(
+        db,
+        api_key_id=api_key.id,
+        org_id=api_key.org_id,
+        method=request.method,
+        path=request.url.path,
+        status_code=200,
+        response_time_ms=0,
+    )
     return {"org_id": api_key.org_id, "key_id": api_key.id}
 
 
