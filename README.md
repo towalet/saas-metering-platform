@@ -96,6 +96,27 @@ A production-style SaaS backend starter focused on **API key management, rate li
   - Asserts exact response fields including UTC month reset timestamp
 - **49 total tests passing** across auth, orgs, API keys, rate limiting, usage metering, and quotas
 
+### Day 9 - Phase 5: Usage reporting API
+- Added dashboard reporting endpoint:
+  - `GET /orgs/{org_id}/usage`
+- Query params:
+  - `from_date` (ISO date, optional)
+  - `to_date` (ISO date, optional)
+  - `group_by` (`hour | day | month`, default `day`)
+- Defaults:
+  - `from_date` -> first day of current UTC month
+  - `to_date` -> current UTC date
+- Auth + RBAC:
+  - JWT required
+  - owner/admin only via `require_org_role(...)`
+- Aggregation output:
+  - `total_requests`
+  - `quota_limit`
+  - `quota_used_pct`
+  - grouped `series` with `count` + `avg_latency_ms`
+- Added schemas in `backend/app/schemas/usage.py`
+- Added aggregation service `aggregate_usage()` in `backend/app/services/usage.py`
+- Added endpoint tests for day/hour/month aggregation, role access, and date-range validation
 ---
 
 ## Project Structure
@@ -108,7 +129,8 @@ backend/
 │   ├── api/              # Route handlers
 │   │   ├── auth.py       # /auth/signup, /auth/login, /auth/me
 │   │   ├── orgs.py       # /orgs CRUD + member management
-│   │   └── api_keys.py   # /orgs/{id}/api-keys CRUD
+│   │   ├── api_keys.py   # /orgs/{id}/api-keys CRUD
+│   │   └── usage.py      # Reporting endpoint.
 │   ├── core/
 │   │   ├── roles.py      # RBAC helper (require_org_role)
 │   │   ├── security.py   # Argon2 hashing, JWT, API key auth dependency
@@ -128,7 +150,8 @@ backend/
 │   ├── schemas/
 │   │   ├── auth.py       # SignupIn, TokenOut, UserOut
 │   │   ├── orgs.py       # OrgCreateIn, OrgOut, OrgMemberAddIn, OrgMemberOut
-│   │   └── api_keys.py   # ApiKeyCreateIn, ApiKeyCreateOut, ApiKeyOut
+│   │   ├── api_keys.py   # ApiKeyCreateIn, ApiKeyCreateOut, ApiKeyOut
+│   │   └── usage.py      # Usage response schemas
 │   ├── services/
 │   │   ├── users.py      # create_user, get_user_by_email
 │   │   ├── orgs.py       # create_org, list_user_orgs, add_member_by_email
@@ -141,7 +164,7 @@ backend/
 │   ├── test_orgs.py      # Org endpoint + RBAC tests (11 tests)
 │   ├── test_api_keys.py  # API key CRUD + X-API-Key auth tests (18 tests)
 │   ├── test_rate_limit.py # Tests for the sliding-window rate limiter (6 tests)
-│   ├── test_usage.py     # Usage metering tests (5 tests)
+│   ├── test_usage.py     # Usage metering tests (5 + 7 tests)
 │   └── test_quotas.py    # Sets low quota, make 3 requests (pass), 4th request returns 429 with correct body.
 ├── Dockerfile
 └── pyproject.toml
@@ -166,6 +189,7 @@ backend/
 | POST   | `/orgs/{org_id}/api-keys`           | JWT     | Generate API key (owner/admin)          |
 | GET    | `/orgs/{org_id}/api-keys`           | JWT     | List API keys (prefix only, no secrets) |
 | DELETE | `/orgs/{org_id}/api-keys/{key_id}`  | JWT     | Revoke (soft-delete) an API key         |
+| GET    | `/orgs/{org_id}/usage`              | JWT     | Usage reporting (owner/admin)           |
 
 ---
 
@@ -221,4 +245,4 @@ make down    # docker compose down -v
 make logs    # docker compose logs -f api
 ```
 
-
+Current backend test status: `56 passed`.
