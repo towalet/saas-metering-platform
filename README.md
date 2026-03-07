@@ -2,7 +2,7 @@
 
 A production-style SaaS backend starter focused on **API key management, rate limiting, quotas, usage metering, and billing-ready reporting**.
 
-## Status (Days 1-9)
+## Status (Days 1-10)
 
 ### Day 1 - Containerized dev stack
 - Docker Compose stack running:
@@ -117,6 +117,25 @@ A production-style SaaS backend starter focused on **API key management, rate li
 - Added schemas in `backend/app/schemas/usage.py`
 - Added aggregation service `aggregate_usage()` in `backend/app/services/usage.py`
 - Added endpoint tests for day/hour/month aggregation, role access, and date-range validation
+
+### Day 10 - Phase 6: Sample protected API (/v1/events)
+- **Event model** - `events` table for custom events ingested via API
+  - Columns: id, org_id, api_key_id, event_type, payload (JSON), created_at
+  - Alembic migration for `events` table
+- **POST /v1/events** - Ingest a custom event (event_type + arbitrary data payload)
+  - Full pipeline: API key auth → rate limit → quota → process → record usage
+  - Returns 201 with created event
+- **GET /v1/events** - List recent events for the org tied to the API key
+  - Optional `limit` query param (default 100)
+- **Rate limiter integration** - v1 routes use `check_rate_limit` with per-org `rate_limit_rpm`
+  - Response headers: `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`
+  - Returns 429 when limit exceeded
+- **Usage recording** - Every v1 request records a `UsageEvent` row
+- Added `backend/app/api/v1.py`, `backend/app/schemas/events.py`, `backend/app/services/events.py`
+- Added `get_redis_dep()` in `backend/app/core/redis.py` for test overrides
+- Full test suite (`test_v1.py` - 8 tests: POST/GET success, auth, rate limit, org isolation)
+- **64 total tests passing**
+
 ---
 
 ## Project Structure
