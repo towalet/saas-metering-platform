@@ -2,7 +2,7 @@
 
 A production-style SaaS backend starter focused on **API key management, rate limiting, quotas, usage metering, and billing-ready reporting**.
 
-## Status (Days 1-8)
+## Status (Days 1-9)
 
 ### Day 1 - Containerized dev stack
 - Docker Compose stack running:
