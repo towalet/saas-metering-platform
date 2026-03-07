@@ -15,11 +15,27 @@ from app.db.base import Base
 from app.db.deps import get_db
 from app.main import app
 from app.models.api_key import ApiKey
+from app.core.redis import get_redis_dep
 from app.core.security import get_current_api_key
 from app.services.usage import record_usage
 
-# In-memory SQLite engine shared across a single test 
+# In-memory SQLite engine shared across a single test
 SQLITE_URL = "sqlite://"
+
+
+class FakeRedis:
+    """Minimal in-memory Redis substitute for testing rate limiting."""
+
+    def __init__(self):
+        self._store: dict[str, int] = {}
+        self._expiries: dict[str, int] = {}
+
+    def incr(self, key: str) -> int:
+        self._store[key] = self._store.get(key, 0) + 1
+        return self._store[key]
+
+    def expire(self, key: str, seconds: int) -> None:
+        self._expiries[key] = seconds
 
 # Test-only route to verify API key authentication 
 # This tiny endpoint exists solely so tests can verify X-API-Key auth
@@ -71,7 +87,9 @@ def client(db_session):
         finally:
             pass
 
+    fake_redis = FakeRedis()
     app.dependency_overrides[get_db] = _override_get_db
+    app.dependency_overrides[get_redis_dep] = lambda: fake_redis
     with TestClient(app) as tc:
         yield tc
     app.dependency_overrides.clear()

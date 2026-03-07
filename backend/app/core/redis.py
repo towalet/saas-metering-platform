@@ -32,6 +32,11 @@ def get_redis() -> sync_redis.Redis:
         )
     return _sync_pool
 
+
+def get_redis_dep() -> sync_redis.Redis:
+    """FastAPI dependency for Redis client. Overridable in tests."""
+    return get_redis()
+
 # Close the Redis connection pool on app shutdown
 def close_redis() -> None:
     """Shutdown the Redis connection pool (call on app shutdown)."""

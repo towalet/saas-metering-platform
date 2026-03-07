@@ -5,6 +5,7 @@ from app.api.auth import router as auth_router
 from app.api.orgs import router as orgs_router
 from app.api.api_keys import router as api_keys_router
 from app.api.usage import router as usage_router
+from app.api.v1 import router as v1_router
 from app.core.quota import MonthlyQuotaExceededError
 
 app = FastAPI(title="SaaS Metering Platform", version="0.1.0")
@@ -33,3 +34,4 @@ app.include_router(auth_router)
 app.include_router(orgs_router)
 app.include_router(api_keys_router)
 app.include_router(usage_router)
+app.include_router(v1_router)

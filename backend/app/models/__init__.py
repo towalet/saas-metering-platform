@@ -3,3 +3,5 @@ from .orgs import Org  # noqa: F401
 from .org_member import OrgMember  # noqa: F401
 from .api_key import ApiKey  # noqa: F401
 from .usage_event import UsageEvent  # noqa: F401
+from .event import Event  # noqa: F401
+from .event import Event  # noqa: F401

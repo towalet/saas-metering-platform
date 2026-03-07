@@ -130,7 +130,8 @@ backend/
 │   │   ├── auth.py       # /auth/signup, /auth/login, /auth/me
 │   │   ├── orgs.py       # /orgs CRUD + member management
 │   │   ├── api_keys.py   # /orgs/{id}/api-keys CRUD
-│   │   └── usage.py      # Reporting endpoint.
+│   │   ├── usage.py      # Reporting endpoint
+│   │   └── v1.py         # /v1/events (API-key-authed, rate limited)
 │   ├── core/
 │   │   ├── roles.py      # RBAC helper (require_org_role)
 │   │   ├── security.py   # Argon2 hashing, JWT, API key auth dependency
@@ -146,7 +147,8 @@ backend/
 │   │   ├── orgs.py        # Org ORM model (+ rate_limit_rpm, monthly_quota)
 │   │   ├── org_member.py  # OrgMember ORM model
 │   │   ├── api_key.py     # ApiKey ORM model (SHA-256 hashed keys)
-│   │   └── usage_event.py # UsageEvent ORM model (request log)
+│   │   ├── usage_event.py # UsageEvent ORM model (request log)
+│   │   └── event.py      # Event ORM model (custom events from /v1/events)
 │   ├── schemas/
 │   │   ├── auth.py       # SignupIn, TokenOut, UserOut
 │   │   ├── orgs.py       # OrgCreateIn, OrgOut, OrgMemberAddIn, OrgMemberOut
@@ -165,7 +167,8 @@ backend/
 │   ├── test_api_keys.py  # API key CRUD + X-API-Key auth tests (18 tests)
 │   ├── test_rate_limit.py # Tests for the sliding-window rate limiter (6 tests)
 │   ├── test_usage.py     # Usage metering tests (5 + 7 tests)
-│   └── test_quotas.py    # Sets low quota, make 3 requests (pass), 4th request returns 429 with correct body.
+│   ├── test_quotas.py    # Sets low quota, make 3 requests (pass), 4th request returns 429 with correct body.
+│   └── test_v1.py       # /v1/events tests (POST, GET, rate limit, org isolation)
 ├── Dockerfile
 └── pyproject.toml
 ```
@@ -190,6 +193,8 @@ backend/
 | GET    | `/orgs/{org_id}/api-keys`           | JWT     | List API keys (prefix only, no secrets) |
 | DELETE | `/orgs/{org_id}/api-keys/{key_id}`  | JWT     | Revoke (soft-delete) an API key         |
 | GET    | `/orgs/{org_id}/usage`              | JWT     | Usage reporting (owner/admin)           |
+| POST   | `/v1/events`                        | API Key | Ingest custom event (rate limited)     |
+| GET    | `/v1/events`                        | API Key | List recent events for org              |
 
 ---
 
@@ -245,4 +250,4 @@ make down    # docker compose down -v
 make logs    # docker compose logs -f api
 ```
 
-Current backend test status: `56 passed`.
+Current backend test status: `64 passed`.
