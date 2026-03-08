@@ -1,6 +1,6 @@
 # SaaS Metering Platform (WIP)
 
-[![CI](https://github.com/USERNAME/REPO/actions/workflows/ci.yml/badge.svg)](https://github.com/USERNAME/REPO/actions/workflows/ci.yml)
+[![CI](https://github.com/towalet/saas-metering-platform/actions/workflows/ci.yml/badge.svg)](https://github.com/towalet/saas-metering-platform/actions/workflows/ci.yml)
 
 A production-style SaaS backend starter focused on **API key management, rate limiting, quotas, usage metering, and billing-ready reporting**.
 
