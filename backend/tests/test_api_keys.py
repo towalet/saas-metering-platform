@@ -177,3 +177,17 @@ class TestApiKeyAuth:
         )
         assert resp.status_code == 401
 
+    def test_auth_returns_rate_limit_headers(self, client: TestClient, auth_headers):
+        """All API-key-authed responses include X-RateLimit-* headers."""
+        org = _create_org(client, auth_headers)
+        key_data = _create_api_key(client, auth_headers, org["id"])
+
+        resp = client.get(
+            "/test/api-key-check",
+            headers={"X-API-Key": key_data["key"]},
+        )
+        assert resp.status_code == 200
+        assert "X-RateLimit-Limit" in resp.headers
+        assert "X-RateLimit-Remaining" in resp.headers
+        assert "X-RateLimit-Reset" in resp.headers
+

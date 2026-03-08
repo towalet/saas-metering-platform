@@ -1,8 +1,10 @@
 # SaaS Metering Platform (WIP)
 
+[![CI](https://github.com/USERNAME/REPO/actions/workflows/ci.yml/badge.svg)](https://github.com/USERNAME/REPO/actions/workflows/ci.yml)
+
 A production-style SaaS backend starter focused on **API key management, rate limiting, quotas, usage metering, and billing-ready reporting**.
 
-## Status (Days 1-10)
+## Status (Days 1-11)
 
 ### Day 1 - Containerized dev stack
 - Docker Compose stack running:
@@ -69,6 +71,7 @@ A production-style SaaS backend starter focused on **API key management, rate li
 - **Redis connection pool** in `backend/app/core/redis.py`: shared sync client with lazy init and configurable `REDIS_HOST` / `REDIS_PORT`, ready for rate limiting and future caching
 - **Rate limiter** in `backend/app/core/rate_limit.py`: fixed-window (per-minute default) counter using Redis `INCR` + `EXPIRE`, key format `rl:{api_key_id}:{window_start}`, returns `RateLimitResult` for headers `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`
 - **Per-org limits** stored on `Org.rate_limit_rpm` in `backend/app/models/orgs.py`
+- **Phase 2 complete:** Rate limiting integrated into `get_current_api_key` — every API-key-authed response gets `X-RateLimit-*` headers; 429 when exceeded
 - **Tests** added in `backend/tests/test_rate_limit.py`
 
 ### Day 7 - Usage metering
@@ -136,6 +139,12 @@ A production-style SaaS backend starter focused on **API key management, rate li
 - Full test suite (`test_v1.py` - 8 tests: POST/GET success, auth, rate limit, org isolation)
 - **64 total tests passing**
 
+### Day 11 - Phase 7: GitHub Actions CI
+- **Workflow** `.github/workflows/ci.yml` runs pytest on every push and pull request
+- Triggers: `on: [push, pull_request]`
+- Steps: checkout → set up Python 3.12 → cache pip → install `.[test]` → pytest
+- Replace `USERNAME/REPO` in the CI badge above with your GitHub username and repo name
+
 ---
 
 ## Project Structure
@@ -191,10 +200,6 @@ backend/
 ├── Dockerfile
 └── pyproject.toml
 ```
-
-## Recent Additions
-- `backend/app/core/quota.py` - Monthly quota dependency and reset-timestamp calculation
-- `backend/tests/test_quotas.py` - Integration test for 3-pass then 4th-request-429 quota flow
 
 ---
 ## API Endpoints
@@ -269,4 +274,4 @@ make down    # docker compose down -v
 make logs    # docker compose logs -f api
 ```
 
-Current backend test status: `64 passed`.
+Current backend test status: `65 passed`.

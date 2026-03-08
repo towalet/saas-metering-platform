@@ -2,14 +2,18 @@ import os
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from fastapi import Depends, HTTPException, Security, status
+from fastapi import Depends, HTTPException, Response, Security, status
 from fastapi.security import APIKeyHeader
 from jose import jwt
 from passlib.context import CryptContext
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.db.deps import get_db
 from app.core.quota import enforce_monthly_quota
+from app.core.rate_limit import check_rate_limit
+from app.core.redis import get_redis_dep
+from app.db.deps import get_db
+from app.models.orgs import Org
 
 
 # Argon2 strong password hashing scheme. passlib manages hashing/verification.
@@ -71,10 +75,12 @@ def decode_token(token: str) -> Any:
     algorithm = _get_jwt_algorithm()
     return jwt.decode(token, secret, algorithms=[algorithm])
 
-# API Key authentication dependency 
+# API Key authentication dependency
 def get_current_api_key(
+    response: Response,
     raw_key: str | None = Security(_api_key_header),
     db: Session = Depends(get_db),
+    redis_client: Any = Depends(get_redis_dep),
 ):
     """
     FastAPI dependency that authenticates requests via the X-API-Key header.
@@ -84,7 +90,10 @@ def get_current_api_key(
       2. SHA-256 hash it.
       3. Look up the hash in the api_keys table.
       4. If not found, revoked, or expired -> 401.
-      5. Otherwise return the ApiKey row so the endpoint knows which org is calling.
+      5. Enforce monthly quota -> 429 if exceeded.
+      6. Check rate limit (Redis) -> 429 if exceeded.
+      7. Set X-RateLimit-* headers on response.
+      8. Return the ApiKey row.
 
     Usage in an endpoint:
         @router.get("/something")
@@ -107,7 +116,26 @@ def get_current_api_key(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or revoked API key",
         )
-        
-    # Enforce the monthly quota for the org. If the quota is exceeded, raise a MonthlyQuotaExceededError.
+
+    # Enforce the monthly quota for the org. If the quota is exceeded, raise MonthlyQuotaExceededError.
     enforce_monthly_quota(db, api_key.org_id)
+
+    # Rate limit: fetch org's limit, check Redis, set headers or raise 429
+    org = db.execute(select(Org).where(Org.id == api_key.org_id)).scalar_one_or_none()
+    limit = org.rate_limit_rpm if org else 60
+
+    result = check_rate_limit(redis_client, key_id=api_key.id, limit=limit)
+
+    if not result.allowed:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Rate limit exceeded",
+            headers={"Retry-After": str(result.reset_at)},
+        )
+
+    # Inject X-RateLimit-* headers on every API-key-authed response
+    response.headers["X-RateLimit-Limit"] = str(result.limit)
+    response.headers["X-RateLimit-Remaining"] = str(result.remaining)
+    response.headers["X-RateLimit-Reset"] = str(result.reset_at)
+
     return api_key
